@@ -5,7 +5,7 @@ import secure_crypto as crypto
 client_sock = []
 public_keys = []
 
-HOST = gethostbyname(gethostname())
+HOST = "10.250.11.53"
 PORT = 42000
 BUFFER_SIZE = 4096
 ADDRESS = (HOST, PORT)
