@@ -25,7 +25,8 @@ name = st.text_input("Your Name", value="Guest")
 password = st.text_input("Connection Password", type="password")
 
 # Authentication password (can be moved to env var or config file)
-EXPECTED_PASSWORD = "entice123"
+EXPECTED_PASSWORD = "Bilal@123"
+
 
 # Connect button
 if st.button("Connect") and not st.session_state.connected:
