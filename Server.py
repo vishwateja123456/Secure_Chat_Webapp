@@ -5,7 +5,7 @@ import secure_crypto as crypto
 client_sock = []
 public_keys = []
 
-HOST = "caboose.proxy.rlwy.net"
+HOST = "10.0.0.48"
 PORT = 30805
 BUFFER_SIZE = 4096
 ADDRESS = (HOST, PORT)
