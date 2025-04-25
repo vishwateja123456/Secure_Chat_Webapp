@@ -4,48 +4,58 @@ import secure_crypto as crypto
 
 client_sock = []
 public_keys = []
-
-HOST = "10.0.0.48"
-PORT = 30805
+shared_keys = {}
 BUFFER_SIZE = 4096
+
+HOST = "10.0.0.48"  
+PORT = 30805
 ADDRESS = (HOST, PORT)
 
 SERVER = socket(AF_INET, SOCK_STREAM)
 SERVER.bind(ADDRESS)
-SERVER.listen(5)
+SERVER.listen(10)  # can accept up to 10 clients at once
 
 print(f"[SERVER STARTED] Listening on {HOST}:{PORT}")
-print("[WAITING] Waiting for 2 clients to connect...")
 
-# Accept clients until 2 are ready
-while len(client_sock) < 2:
-    client, addr = SERVER.accept()
-    print(f"[CONNECTED] Client {len(client_sock)+1} from {addr}")
-    client_sock.append(client)
-    pub_key = client.recv(BUFFER_SIZE)
-    public_keys.append(pub_key)
-    print(f"[KEY RECEIVED] from Client {len(client_sock)}")
+def handle_client(client):
+    # Perform key exchange
+    try:
+        pub_key = client.recv(BUFFER_SIZE)
+        peer_public_key = crypto.deserialize_public_key(pub_key)
+        private_key, public_key = crypto.generate_dh_key_pair()
+        client.send(crypto.serialize_public_key(public_key))
+        shared_key = crypto.derive_shared_key(private_key, peer_public_key)
+        shared_keys[client] = shared_key
 
-# Exchange public keys
-client_sock[0].send(public_keys[1])
-client_sock[1].send(public_keys[0])
-print("[KEY EXCHANGE COMPLETE]")
-
-# Start forwarding messages
-def forward_messages(sender_idx):
-    receiver_idx = 1 - sender_idx
-    while True:
-        try:
-            msg = client_sock[sender_idx].recv(BUFFER_SIZE)
+        while True:
+            msg = client.recv(BUFFER_SIZE)
             if not msg:
-                print(f"[DISCONNECT] Client {sender_idx + 1} disconnected.")
+                print("[DISCONNECT] Client disconnected.")
+                client_sock.remove(client)
+                del shared_keys[client]
+                client.close()
                 break
-            print(f"[FORWARD] Client {sender_idx + 1} → Client {receiver_idx + 1}")
-            client_sock[receiver_idx].send(msg)
-        except Exception as e:
-            print(f"[ERROR] Forwarding failed: {e}")
-            break
+            print("[MESSAGE RECEIVED] Broadcasting...")
+            broadcast(msg, sender=client)
+    except Exception as e:
+        print(f"[ERROR] Client handling failed: {e}")
+        if client in client_sock:
+            client_sock.remove(client)
+        if client in shared_keys:
+            del shared_keys[client]
+        client.close()
 
-Thread(target=forward_messages, args=(0,), daemon=True).start()
-Thread(target=forward_messages, args=(1,), daemon=True).start()
-print("[MESSAGE RELAY STARTED]")
+def broadcast(message, sender=None):
+    for client in client_sock:
+        if client != sender:
+            try:
+                client.send(message)
+            except Exception as e:
+                print(f"[ERROR] Failed to send to a client: {e}")
+
+# Accept incoming connections
+while True:
+    client, addr = SERVER.accept()
+    print(f"[CONNECTED] {addr}")
+    client_sock.append(client)
+    Thread(target=handle_client, args=(client,), daemon=True).start()
